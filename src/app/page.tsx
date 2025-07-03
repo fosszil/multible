@@ -114,7 +114,6 @@ export default function HomePage() {
         <ProblemDisplay num1={num1} num2={num2} userAnswer={userAnswer} />
         <Numpad
           onDigit={handleDigit}
-          onDecimal={() => {}} // Decimal button does nothing
           onClear={handleClear}
           onDelete={handleDelete}
         />
