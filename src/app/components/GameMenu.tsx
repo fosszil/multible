@@ -10,7 +10,7 @@ const GameMenu = ({ onStartPractice, onStartPro }: GameMenuProps) => {
 
   return (
     <div className="w-full max-w-sm mx-auto p-6 bg-gray-800 rounded-lg shadow-2xl text-white text-center">
-      <h1 className="text-4xl font-bold mb-6">Multiplication Master</h1>
+      <h1 className="text-4xl font-bold mb-6">Multible</h1>
 
       <div className="mb-8">
         <h2 className="text-2xl font-semibold mb-4 text-blue-300">

@@ -7,10 +7,10 @@ import Scoreboard from "./Scoreboard";
 
 type GameScreenProps = {
   mode: "practice" | "pro";
-  practiceTable?: number; // The table to practice (e.g., 7s)
+  practiceTable?: number;
   onScoreUpdate: (newScore: number) => void;
-  onGameOver?: () => void; // Only for Pro Mode
-  initialTime?: number; // Only for Pro Mode
+  onGameOver?: () => void;
+  initialTime?: number;
 };
 
 const generateRandomNumber = (max = 12) =>
@@ -28,10 +28,12 @@ export const GameScreen = ({
   const [userAnswer, setUserAnswer] = useState("");
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
+  // --- THE FIX: We add a new state to track if the game is active ---
+  const [isGameActive, setIsGameActive] = useState(true);
+
   const [timeLeft, setTimeLeft] = useState(initialTime);
 
   const generateNewProblem = useCallback(() => {
-    // In practice mode, one number is fixed. In pro mode, both are random.
     const newNum1 =
       mode === "practice" ? practiceTable! : generateRandomNumber();
     const newNum2 = generateRandomNumber();
@@ -47,19 +49,32 @@ export const GameScreen = ({
 
   // Timer logic for Pro Mode
   useEffect(() => {
-    if (mode !== "pro") return;
+    if (mode !== "pro" || !isGameActive) return;
 
-    if (timeLeft <= 0) {
-      onGameOver?.(); // Tell the parent component the game is over
-      return;
-    }
-
+    // Set up the interval
     const timerId = setInterval(() => {
-      setTimeLeft((prevTime) => prevTime - 1);
+      setTimeLeft((prevTime) => {
+        // --- THE FIX: We update our own state first ---
+        if (prevTime <= 1) {
+          setIsGameActive(false); // Stop the game internally
+          clearInterval(timerId); // Stop the timer immediately
+          return 0;
+        }
+        return prevTime - 1;
+      });
     }, 1000);
 
-    return () => clearInterval(timerId); // Cleanup on unmount
-  }, [mode, timeLeft, onGameOver]);
+    return () => clearInterval(timerId);
+  }, [mode, isGameActive]); // Depend on our new state
+
+  // --- THE FIX: A NEW useEffect to handle telling the parent about the game over ---
+  // This effect runs ONLY when 'isGameActive' changes.
+  useEffect(() => {
+    // If the game has just become inactive, tell the parent.
+    if (!isGameActive) {
+      onGameOver?.();
+    }
+  }, [isGameActive, onGameOver]);
 
   const checkAnswer = useCallback(
     (currentAnswer: string) => {
@@ -70,7 +85,7 @@ export const GameScreen = ({
         setIsCorrect(true);
         const newScore = score + 1;
         setScore(newScore);
-        onScoreUpdate(newScore); // Inform parent of score change
+        onScoreUpdate(newScore);
         setTimeout(() => generateNewProblem(), 800);
       } else if (currentAnswer.length >= String(correctAnswer).length) {
         setIsCorrect(false);
@@ -85,14 +100,14 @@ export const GameScreen = ({
 
   const handleDigit = useCallback(
     (digit: string) => {
-      if (isCorrect) return;
+      if (isCorrect || !isGameActive) return; // Also block input if game is over
       setUserAnswer((prev) => {
         const newAnswer = prev + digit;
         checkAnswer(newAnswer);
         return newAnswer;
       });
     },
-    [isCorrect, checkAnswer]
+    [isCorrect, isGameActive, checkAnswer]
   );
 
   const handleDelete = useCallback(
