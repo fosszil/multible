@@ -2,74 +2,130 @@
 
 "use client";
 
-// 1. Import useEffect and useCallback from React
 import React, { useState, useEffect, useCallback } from "react";
 import Numpad from "./components/NumPad";
+import ProblemDisplay from "./components/ProblemDisplay";
+
+const generateRandomNumber = (max = 12) => {
+  // Increased max for more variety
+  return Math.floor(Math.random() * max); // Generates 0 to 11
+};
 
 export default function HomePage() {
-  const [value, setValue] = useState("");
+  // --- STATE MANAGEMENT ---
+  const [num1, setNum1] = useState(0);
+  const [num2, setNum2] = useState(0);
+  const [userAnswer, setUserAnswer] = useState("");
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
-  // --- Handler Functions ---
-  // We wrap these in useCallback to prevent them from being recreated on every render.
-  // This is an optimization that helps our useEffect hook work more efficiently.
+  // --- PROBLEM GENERATION LOGIC ---
+  const generateNewProblem = useCallback(() => {
+    setNum1(generateRandomNumber());
+    setNum2(generateRandomNumber());
+    setUserAnswer("");
+    setIsCorrect(null);
+  }, []); // This function has no dependencies, so it's created only once.
 
-  const handleDigit = useCallback((digit: string) => {
-    // Use the functional form of setValue to avoid dependency on 'value'
-    setValue((prevValue) => prevValue + digit);
-  }, []); // Empty dependency array means this function is never recreated
+  useEffect(() => {
+    generateNewProblem();
+  }, [generateNewProblem]);
 
+  // --- ANSWER CHECKING LOGIC ---
+  // 1. Wrap `checkAnswer` in useCallback and define its dependencies.
+  const checkAnswer = useCallback(
+    (currentAnswer: string) => {
+      if (!currentAnswer) return; // Don't check if the answer is empty
 
-  const handleClear = useCallback(() => {
-    setValue("");
-  }, []);
+      const correctAnswer = num1 * num2;
+      if (parseInt(currentAnswer, 10) === correctAnswer) {
+        setIsCorrect(true);
+        setTimeout(() => generateNewProblem(), 1000);
+      } else if (currentAnswer.length >= String(correctAnswer).length) {
+        setIsCorrect(false);
+        setTimeout(() => {
+          setUserAnswer("");
+          setIsCorrect(null);
+        }, 1000);
+      } else {
+        setIsCorrect(null); // Still typing
+      }
+    },
+    [num1, num2, generateNewProblem]
+  ); // Its dependencies are the values it uses
+
+  // --- HANDLER FUNCTIONS for Numpad and Keyboard ---
+  const handleDigit = useCallback(
+    (digit: string) => {
+      if (isCorrect) return; // Prevent typing after a correct answer
+
+      setUserAnswer((prevAnswer) => {
+        const newAnswer = prevAnswer + digit;
+        checkAnswer(newAnswer); // Check the answer immediately after state update
+        return newAnswer;
+      });
+    },
+    [isCorrect, checkAnswer]
+  ); // 2. Add 'checkAnswer' to the dependency array.
 
   const handleDelete = useCallback(() => {
-    setValue((prevValue) => prevValue.slice(0, -1));
+    setUserAnswer((prev) => prev.slice(0, -1));
+    setIsCorrect(null);
   }, []);
 
-  // 2. The useEffect hook to handle keyboard input
-  useEffect(() => {
-    // This function will be called whenever a key is pressed down
-    const handleKeyDown = (event: KeyboardEvent) => {
-      event.preventDefault(); // Prevent default browser actions for keys
+  const handleClear = useCallback(() => {
+    setUserAnswer("");
+    setIsCorrect(null);
+  }, []);
 
-      // Check which key was pressed
+  // Keyboard support remains the same but now uses the stable handlers
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isCorrect) return; // Also block keyboard input when correct
+
       if (event.key >= "0" && event.key <= "9") {
         handleDigit(event.key);
       } else if (event.key === "Backspace") {
         handleDelete();
       } else if (event.key === "Escape" || event.key === "Delete") {
-        // Use 'Escape' or 'Delete' key to clear the input
         handleClear();
       }
     };
-
-    // Add the event listener to the whole window
     window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isCorrect, handleDigit, handleDelete, handleClear]);
 
-    // 3. The "cleanup" function
-    // This function is returned by useEffect and runs when the component is unmounted.
-    // It's crucial for preventing memory leaks!
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [handleDigit, handleDelete, handleClear]); // 4. The dependency array
+  // --- UI LOGIC ---
+  const getBorderColor = () => {
+    if (isCorrect === true) return "border-green-500";
+    if (isCorrect === false) return "border-red-500";
+    return "border-gray-700";
+  };
+
+  // A small improvement to add a "shake" animation on wrong answers
+  const getShakeClass = () => {
+    return isCorrect === false ? "animate-shake" : "";
+  };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-gray-800 rounded-t-lg p-4 text-right text-4xl font-mono text-white overflow-x-auto">
-          {value || "0"}
-        </div>
+      <div
+        className={`w-full max-w-xs mx-auto rounded-lg shadow-2xl overflow-hidden border-4 transition-all duration-300 ${getBorderColor()} ${getShakeClass()}`}
+      >
+        <ProblemDisplay num1={num1} num2={num2} userAnswer={userAnswer} />
         <Numpad
           onDigit={handleDigit}
+          onDecimal={() => {}} // Decimal button does nothing
           onClear={handleClear}
           onDelete={handleDelete}
         />
       </div>
-      <p className="mt-8 text-gray-400 text-center">
-        Try using your physical keyboard! (Numbers, '.', Backspace, Escape)
-      </p>
+      <button
+        onClick={generateNewProblem}
+        className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        Skip / New Problem
+      </button>
     </main>
   );
 }
+
