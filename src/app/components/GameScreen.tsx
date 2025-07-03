@@ -9,6 +9,7 @@ type GameScreenProps = {
   mode: "practice" | "pro";
   practiceTable?: number;
   onScoreUpdate: (newScore: number) => void;
+  onGoToMenu: () => void;
   onGameOver?: () => void;
   initialTime?: number;
 };
@@ -20,6 +21,7 @@ export const GameScreen = ({
   mode,
   practiceTable,
   onScoreUpdate,
+  onGoToMenu,
   onGameOver,
   initialTime = 60,
 }: GameScreenProps) => {
@@ -28,7 +30,6 @@ export const GameScreen = ({
   const [userAnswer, setUserAnswer] = useState("");
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
-  // --- THE FIX: We add a new state to track if the game is active ---
   const [isGameActive, setIsGameActive] = useState(true);
 
   const [timeLeft, setTimeLeft] = useState(initialTime);
@@ -136,6 +137,12 @@ export const GameScreen = ({
         onClear={handleClear}
         onDelete={handleDelete}
       />
+      <button
+        onClick={onGoToMenu}
+        className="mt-6 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+      >
+        ← Back to Menu
+      </button>
     </div>
   );
 };

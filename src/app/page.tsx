@@ -1,3 +1,4 @@
+// src/app/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -26,12 +27,12 @@ export default function HomePage() {
     setGameState("gameover");
   };
 
-  const handlePlayAgain = () => {
+  // This function will be used for both going back from the game and playing again
+  const handleGoToMenu = () => {
     setGameState("menu");
   };
 
   const handleScoreUpdate = (newScore: number) => {
-    // This is useful for Pro Mode to set the final score
     setFinalScore(newScore);
   };
 
@@ -43,6 +44,7 @@ export default function HomePage() {
             mode="practice"
             practiceTable={practiceTable}
             onScoreUpdate={handleScoreUpdate}
+            onGoToMenu={handleGoToMenu} // <-- FIX: Added the missing prop
           />
         );
       case "pro":
@@ -51,11 +53,13 @@ export default function HomePage() {
             mode="pro"
             onScoreUpdate={handleScoreUpdate}
             onGameOver={handleGameOver}
+            onGoToMenu={handleGoToMenu} // <-- FIX: Added the missing prop
             initialTime={60}
           />
         );
       case "gameover":
-        return <GameOver score={finalScore} onPlayAgain={handlePlayAgain} />;
+        // We reuse the same handler for the "Play Again" button
+        return <GameOver score={finalScore} onPlayAgain={handleGoToMenu} />;
       case "menu":
       default:
         return (
