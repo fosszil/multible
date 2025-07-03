@@ -31,7 +31,6 @@ export const GameScreen = ({
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
   const [isGameActive, setIsGameActive] = useState(true);
-
   const [timeLeft, setTimeLeft] = useState(initialTime);
 
   const generateNewProblem = useCallback(() => {
@@ -52,13 +51,11 @@ export const GameScreen = ({
   useEffect(() => {
     if (mode !== "pro" || !isGameActive) return;
 
-    // Set up the interval
     const timerId = setInterval(() => {
       setTimeLeft((prevTime) => {
-        // --- THE FIX: We update our own state first ---
         if (prevTime <= 1) {
-          setIsGameActive(false); // Stop the game internally
-          clearInterval(timerId); // Stop the timer immediately
+          setIsGameActive(false);
+          clearInterval(timerId);
           return 0;
         }
         return prevTime - 1;
@@ -66,20 +63,19 @@ export const GameScreen = ({
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [mode, isGameActive]); // Depend on our new state
+  }, [mode, isGameActive]);
 
-  // --- THE FIX: A NEW useEffect to handle telling the parent about the game over ---
-  // This effect runs ONLY when 'isGameActive' changes.
+  // Effect to notify parent when the game is over
   useEffect(() => {
-    // If the game has just become inactive, tell the parent.
     if (!isGameActive) {
       onGameOver?.();
     }
   }, [isGameActive, onGameOver]);
 
+  // Effect to check the answer AFTER the user's answer state has been updated
   const checkAnswer = useCallback(
     (currentAnswer: string) => {
-      if (!currentAnswer) return;
+      if (!currentAnswer || !isGameActive) return;
 
       const correctAnswer = num1 * num2;
       if (parseInt(currentAnswer, 10) === correctAnswer) {
@@ -96,26 +92,36 @@ export const GameScreen = ({
         }, 800);
       }
     },
-    [num1, num2, score, onScoreUpdate, generateNewProblem]
+    [num1, num2, score, isGameActive, onScoreUpdate, generateNewProblem]
   );
 
+  // --- START OF THE FIX ---
+
+  // 1. A new useEffect that watches userAnswer and calls checkAnswer safely
+  useEffect(() => {
+    checkAnswer(userAnswer);
+  }, [userAnswer, checkAnswer]);
+
+  // 2. handleDigit is simplified to ONLY update the state
   const handleDigit = useCallback(
     (digit: string) => {
-      if (isCorrect || !isGameActive) return; // Also block input if game is over
-      setUserAnswer((prev) => {
-        const newAnswer = prev + digit;
-        checkAnswer(newAnswer);
-        return newAnswer;
-      });
+      if (isCorrect || !isGameActive) return;
+      setUserAnswer((prev) => prev + digit);
     },
-    [isCorrect, isGameActive, checkAnswer]
+    [isCorrect, isGameActive]
   );
 
-  const handleDelete = useCallback(
-    () => setUserAnswer((prev) => prev.slice(0, -1)),
-    []
-  );
-  const handleClear = useCallback(() => setUserAnswer(""), []);
+  // --- END OF THE FIX ---
+
+  const handleDelete = useCallback(() => {
+    setIsCorrect(null); // Reset feedback on delete
+    setUserAnswer((prev) => prev.slice(0, -1));
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setIsCorrect(null); // Reset feedback on clear
+    setUserAnswer("");
+  }, []);
 
   const getBorderColor = () => {
     if (isCorrect === true) return "border-green-500";
@@ -123,26 +129,34 @@ export const GameScreen = ({
     return "border-gray-700";
   };
 
+  const getShakeClass = () => {
+    return isCorrect === false ? "animate-shake" : "";
+  };
+
   return (
-    <div
-      className={`w-full max-w-xs mx-auto rounded-lg shadow-2xl overflow-hidden border-4 transition-all duration-300 ${getBorderColor()}`}
-    >
-      <Scoreboard
-        score={score}
-        timeLeft={mode === "pro" ? timeLeft : undefined}
-      />
-      <ProblemDisplay num1={num1} num2={num2} userAnswer={userAnswer} />
-      <Numpad
-        onDigit={handleDigit}
-        onClear={handleClear}
-        onDelete={handleDelete}
-      />
+    // Wrap in a Fragment to allow a sibling element (the button) next to the main div
+    <>
+      <div
+        className={`w-full max-w-xs mx-auto rounded-lg shadow-2xl overflow-hidden border-4 transition-all duration-300 ${getBorderColor()} ${getShakeClass()}`}
+      >
+        <Scoreboard
+          score={score}
+          timeLeft={mode === "pro" ? timeLeft : undefined}
+        />
+        <ProblemDisplay num1={num1} num2={num2} userAnswer={userAnswer} />
+        <Numpad
+          onDigit={handleDigit}
+          onClear={handleClear}
+          onDelete={handleDelete}
+        />
+      </div>
+
       <button
         onClick={onGoToMenu}
         className="mt-6 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
       >
         ← Back to Menu
       </button>
-    </div>
+    </>
   );
 };
