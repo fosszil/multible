@@ -1,7 +1,6 @@
-// src/app/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import GameMenu from "./components/GameMenu";
 import { GameScreen } from "./components/GameScreen";
 import GameOver from "./components/GameOver";
@@ -13,67 +12,65 @@ export default function HomePage() {
   const [practiceTable, setPracticeTable] = useState(0);
   const [finalScore, setFinalScore] = useState(0);
 
-  const handleStartPractice = (table: number) => {
+  // --- THE FIX: Wrap every handler function in useCallback ---
+  // This ensures that the GameScreen component receives stable props,
+  // preventing unnecessary re-renders and useEffect triggers.
+
+  const handleStartPractice = useCallback((table: number) => {
     setPracticeTable(table);
     setGameState("practice");
-  };
+  }, []); // The empty array [] means this function is created only once.
 
-  const handleStartPro = () => {
-    setFinalScore(0); // Reset score for a new game
+  const handleStartPro = useCallback(() => {
+    setFinalScore(0);
     setGameState("pro");
-  };
+  }, []);
 
-  const handleGameOver = () => {
+  const handleGameOver = useCallback(() => {
     setGameState("gameover");
-  };
+  }, []);
 
-  // This function will be used for both going back from the game and playing again
-  const handleGoToMenu = () => {
+  const handleGoToMenu = useCallback(() => {
     setGameState("menu");
-  };
+  }, []);
 
-  const handleScoreUpdate = (newScore: number) => {
+  const handleScoreUpdate = useCallback((newScore: number) => {
     setFinalScore(newScore);
-  };
-
-  const renderGameState = () => {
-    switch (gameState) {
-      case "practice":
-        return (
-          <GameScreen
-            mode="practice"
-            practiceTable={practiceTable}
-            onScoreUpdate={handleScoreUpdate}
-            onGoToMenu={handleGoToMenu} // <-- FIX: Added the missing prop
-          />
-        );
-      case "pro":
-        return (
-          <GameScreen
-            mode="pro"
-            onScoreUpdate={handleScoreUpdate}
-            onGameOver={handleGameOver}
-            onGoToMenu={handleGoToMenu} // <-- FIX: Added the missing prop
-            initialTime={60}
-          />
-        );
-      case "gameover":
-        // We reuse the same handler for the "Play Again" button
-        return <GameOver score={finalScore} onPlayAgain={handleGoToMenu} />;
-      case "menu":
-      default:
-        return (
-          <GameMenu
-            onStartPractice={handleStartPractice}
-            onStartPro={handleStartPro}
-          />
-        );
-    }
-  };
+  }, []);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
-      {renderGameState()}
+      {/* Using direct conditional rendering is the standard, safest pattern in React */}
+
+      {gameState === "menu" && (
+        <GameMenu
+          onStartPractice={handleStartPractice}
+          onStartPro={handleStartPro}
+        />
+      )}
+
+      {gameState === "practice" && (
+        <GameScreen
+          mode="practice"
+          practiceTable={practiceTable}
+          onScoreUpdate={handleScoreUpdate}
+          onGoToMenu={handleGoToMenu}
+        />
+      )}
+
+      {gameState === "pro" && (
+        <GameScreen
+          mode="pro"
+          onScoreUpdate={handleScoreUpdate}
+          onGameOver={handleGameOver}
+          onGoToMenu={handleGoToMenu}
+          initialTime={60}
+        />
+      )}
+
+      {gameState === "gameover" && (
+        <GameOver score={finalScore} onPlayAgain={handleGoToMenu} />
+      )}
     </main>
   );
 }

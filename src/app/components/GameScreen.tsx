@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Numpad from "./NumPad";
 import ProblemDisplay from "./ProblemDisplay";
 import Scoreboard from "./Scoreboard";
@@ -32,6 +32,9 @@ export const GameScreen = ({
   const [score, setScore] = useState(0);
   const [isGameActive, setIsGameActive] = useState(true);
   const [timeLeft, setTimeLeft] = useState(initialTime);
+
+  // This ref prevents the answer-checking effect from running on the initial render.
+  const isInitialMount = useRef(true);
 
   const generateNewProblem = useCallback(() => {
     const newNum1 =
@@ -72,7 +75,6 @@ export const GameScreen = ({
     }
   }, [isGameActive, onGameOver]);
 
-  // Effect to check the answer AFTER the user's answer state has been updated
   const checkAnswer = useCallback(
     (currentAnswer: string) => {
       if (!currentAnswer || !isGameActive) return;
@@ -80,9 +82,12 @@ export const GameScreen = ({
       const correctAnswer = num1 * num2;
       if (parseInt(currentAnswer, 10) === correctAnswer) {
         setIsCorrect(true);
-        const newScore = score + 1;
-        setScore(newScore);
-        onScoreUpdate(newScore);
+        // Use functional update to avoid depending on 'score' state
+        setScore((prevScore) => {
+          const newScore = prevScore + 1;
+          onScoreUpdate(newScore); // Still notify the parent
+          return newScore;
+        });
         setTimeout(() => generateNewProblem(), 800);
       } else if (currentAnswer.length >= String(correctAnswer).length) {
         setIsCorrect(false);
@@ -92,17 +97,20 @@ export const GameScreen = ({
         }, 800);
       }
     },
-    [num1, num2, score, isGameActive, onScoreUpdate, generateNewProblem]
+    // This dependency array is now stable because onScoreUpdate and generateNewProblem are stable.
+    [num1, num2, isGameActive, onScoreUpdate, generateNewProblem]
   );
 
-  // --- START OF THE FIX ---
-
-  // 1. A new useEffect that watches userAnswer and calls checkAnswer safely
+  // This effect safely calls checkAnswer only after the user types.
   useEffect(() => {
-    checkAnswer(userAnswer);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    } else {
+      checkAnswer(userAnswer);
+    }
   }, [userAnswer, checkAnswer]);
 
-  // 2. handleDigit is simplified to ONLY update the state
+  // This handler only updates the answer string.
   const handleDigit = useCallback(
     (digit: string) => {
       if (isCorrect || !isGameActive) return;
@@ -111,15 +119,13 @@ export const GameScreen = ({
     [isCorrect, isGameActive]
   );
 
-  // --- END OF THE FIX ---
-
   const handleDelete = useCallback(() => {
-    setIsCorrect(null); // Reset feedback on delete
+    setIsCorrect(null);
     setUserAnswer((prev) => prev.slice(0, -1));
   }, []);
 
   const handleClear = useCallback(() => {
-    setIsCorrect(null); // Reset feedback on clear
+    setIsCorrect(null);
     setUserAnswer("");
   }, []);
 
@@ -134,7 +140,6 @@ export const GameScreen = ({
   };
 
   return (
-    // Wrap in a Fragment to allow a sibling element (the button) next to the main div
     <>
       <div
         className={`w-full max-w-xs mx-auto rounded-lg shadow-2xl overflow-hidden border-4 transition-all duration-300 ${getBorderColor()} ${getShakeClass()}`}
